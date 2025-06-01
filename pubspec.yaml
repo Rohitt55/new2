@@ -23,7 +23,6 @@ dependencies:
   pdf: ^3.10.4
   printing: ^5.11.0
   flutter_screenutil: ^5.9.3
-  device_preview: ^1.2.0
   flutter_local_notifications: ^19.2.0
   timezone: ^0.10.1
 

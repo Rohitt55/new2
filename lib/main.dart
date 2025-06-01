@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:device_preview/device_preview.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -74,12 +73,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeNotifications();
 
-  runApp(
-    DevicePreview(
-      enabled: false,
-      builder: (context) => const ExpenseApp(),
-    ),
-  );
+  runApp(const ExpenseApp());
 }
 
 class ExpenseApp extends StatelessWidget {
@@ -97,8 +91,6 @@ class ExpenseApp extends StatelessWidget {
           scaffoldBackgroundColor: const Color(0xFFFDF7F0),
         ),
         debugShowCheckedModeBanner: false,
-        locale: DevicePreview.locale(context),
-        builder: DevicePreview.appBuilder,
         home: const EntryPoint(),
         routes: {
           '/welcome': (context) => const WelcomeScreen(),
