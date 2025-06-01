@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../db/database_helper.dart';
+import '../main.dart'; // For cancelAllNotifications()
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -27,7 +28,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _userEmail = email;
       _monthlyBudget = prefs.getDouble('budget_$email');
-      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? false;
+      _notificationsEnabled =
+          prefs.getBool('notifications_enabled_$email') ?? false;
     });
   }
 
@@ -41,13 +43,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           controller: controller,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-              labelText: "Enter amount (৳)", labelStyle: TextStyle(fontSize: 14.sp)),
+            labelText: "Enter amount (৳)",
+            labelStyle: TextStyle(fontSize: 14.sp),
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
               final value = double.tryParse(controller.text.trim());
@@ -55,13 +56,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setDouble('budget_$_userEmail', value);
                 setState(() => _monthlyBudget = value);
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context, true); // ✅ Return to Home and signal update
+                Navigator.pop(context);
+                Navigator.pop(context, true); // Refresh HomeScreen
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Budget updated successfully!"),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                  const SnackBar(content: Text("Budget updated successfully!")),
                 );
               }
             },
@@ -72,10 +70,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _removeMonthlyBudget() async {
+    if (_userEmail == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('budget_$_userEmail');
+    setState(() => _monthlyBudget = null);
+    Navigator.pop(context, true); // Refresh HomeScreen
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Monthly budget removed.")),
+    );
+  }
+
   Future<void> _toggleNotifications(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notifications_enabled', value);
+    if (_userEmail != null) {
+      await prefs.setBool('notifications_enabled_$_userEmail', value);
+    }
     setState(() => _notificationsEnabled = value);
+
+    if (value) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Notifications enabled")),
+      );
+    } else {
+      await cancelAllNotifications();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Notifications disabled")),
+      );
+    }
   }
 
   Future<void> _changePassword() async {
@@ -171,32 +193,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildOptionCard(
-                icon: Icons.attach_money,
-                title: "Set Monthly Budget",
-                color: Colors.green,
-                onTap: _setMonthlyBudget,
-              ),
-              _buildSwitchTile(
-                icon: Icons.notifications_active,
-                title: "Enable Notifications",
-                value: _notificationsEnabled,
-                onChanged: _toggleNotifications,
-                color: Colors.orange,
-              ),
-              _buildOptionCard(
-                icon: Icons.lock,
-                title: "Change Password",
-                color: Colors.blue,
-                onTap: _changePassword,
-              ),
-              _buildOptionCard(
-                icon: Icons.delete_forever,
-                title: "Reset All Data",
-                color: Colors.red,
-                onTap: _confirmReset,
-                isDanger: true,
-              ),
+              _buildOptionCard(icon: Icons.attach_money, title: "Set Monthly Budget", color: Colors.green, onTap: _setMonthlyBudget),
+              _buildOptionCard(icon: Icons.money_off, title: "Remove Monthly Budget", color: Colors.redAccent, onTap: _removeMonthlyBudget, isDanger: true),
+              _buildSwitchTile(icon: Icons.notifications_active, title: "Enable Notifications", value: _notificationsEnabled, onChanged: _toggleNotifications, color: Colors.orange),
+              _buildOptionCard(icon: Icons.lock, title: "Change Password", color: Colors.blue, onTap: _changePassword),
+              _buildOptionCard(icon: Icons.delete_forever, title: "Reset All Data", color: Colors.red, onTap: _confirmReset, isDanger: true),
             ],
           ),
         ),
@@ -204,13 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildOptionCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-    bool isDanger = false,
-  }) {
+  Widget _buildOptionCard({required IconData icon, required String title, required Color color, required VoidCallback onTap, bool isDanger = false}) {
     return Card(
       margin: EdgeInsets.only(bottom: 12.h),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
@@ -224,13 +219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    required Color color,
-  }) {
+  Widget _buildSwitchTile({required IconData icon, required String title, required bool value, required ValueChanged<bool> onChanged, required Color color}) {
     return Card(
       margin: EdgeInsets.only(bottom: 12.h),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),

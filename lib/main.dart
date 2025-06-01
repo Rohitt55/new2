@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_preview/device_preview.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'screens/welcome_screen.dart';
 import 'screens/login_screen.dart';
@@ -13,10 +16,67 @@ import 'screens/transaction_screen.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() {
+// Notification plugin instance
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+FlutterLocalNotificationsPlugin();
+
+Future<void> initializeNotifications() async {
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initSettings = InitializationSettings(android: androidInit);
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+  tz.initializeTimeZones();
+}
+
+Future<void> showSimpleNotification(String title, String body) async {
+  const androidDetails = AndroidNotificationDetails(
+    'main_channel',
+    'Main Notifications',
+    importance: Importance.max,
+    priority: Priority.high,
+  );
+  const details = NotificationDetails(android: androidDetails);
+  await flutterLocalNotificationsPlugin.show(0, title, body, details);
+}
+
+Future<void> scheduleDailyNotification(int hour, int minute, String title, String body) async {
+  await flutterLocalNotificationsPlugin.zonedSchedule(
+    1,
+    title,
+    body,
+    _nextInstance(hour, minute),
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'daily_channel',
+        'Daily Reminder',
+        importance: Importance.max,
+        priority: Priority.high,
+      ),
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    matchDateTimeComponents: DateTimeComponents.time,
+  );
+}
+
+tz.TZDateTime _nextInstance(int hour, int minute) {
+  final now = tz.TZDateTime.now(tz.local);
+  var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+  if (scheduled.isBefore(now)) {
+    scheduled = scheduled.add(const Duration(days: 1));
+  }
+  return scheduled;
+}
+
+Future<void> cancelAllNotifications() async {
+  await flutterLocalNotificationsPlugin.cancelAll();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeNotifications();
+
   runApp(
     DevicePreview(
-      enabled: false, // false in release mode
+      enabled: false,
       builder: (context) => const ExpenseApp(),
     ),
   );
@@ -67,7 +127,6 @@ class _EntryPointState extends State<EntryPoint> {
   @override
   void initState() {
     super.initState();
-    // Directly navigate to welcome screen every time app restarts
     Future.delayed(Duration.zero, () {
       Navigator.pushReplacement(
         context,

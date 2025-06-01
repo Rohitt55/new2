@@ -215,7 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildProfileOption(Icons.settings, "Settings", () {
                   Navigator.pushNamed(context, '/settings').then((updated) {
                     if (updated == true) {
-                      Navigator.pushReplacementNamed(context, '/home');
+                      Navigator.pop(context, true); // Return to HomeScreen with refresh
                     }
                   });
                 }),

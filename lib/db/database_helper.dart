@@ -149,7 +149,7 @@ class DatabaseHelper {
     );
   }
 
-  // ✅ Change user password with old password
+
   Future<int> updateUserPassword(String email, String oldPassword, String newPassword) async {
     final db = await database;
 

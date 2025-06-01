@@ -1,8 +1,12 @@
+
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../db/database_helper.dart';
+import 'settings_screen.dart'; // Ensure this is imported if using direct navigation
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,6 +16,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  bool _hasShownBudgetExceededNotification = false;
+
   int selectedIndex = 0;
   String selectedFilter = 'Today';
   List<Map<String, dynamic>> transactions = [];
@@ -23,10 +31,56 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeNotifications();
     _loadUserEmailAndData();
   }
 
+
+  Future<void> _showBudgetExceededNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    AndroidNotificationDetails('budget_channel', 'Budget Alerts',
+        channelDescription: 'Alerts when budget is exceeded',
+        importance: Importance.max,
+        priority: Priority.high,
+        ticker: 'ticker');
+    const NotificationDetails platformChannelSpecifics =
+    NotificationDetails(android: androidPlatformChannelSpecifics);
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      'Budget Alert',
+      'You have exceeded your monthly budget!',
+      platformChannelSpecifics,
+    );
+  }
+
+
+  Future<void> _initializeNotifications() async {
+
+    // Initialize local notifications
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  }
+
+
+  Future<void> _checkBudgetAndNotify(double expenseTotal) async {
+    if (_hasShownBudgetExceededNotification ||
+        selectedFilter != 'Month' ||
+        _monthlyBudget == null ||
+        expenseTotal <= _monthlyBudget!) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notifications_enabled_$_userEmail') ?? false;
+
+    if (notificationsEnabled) {
+      _showBudgetExceededNotification();
+      _hasShownBudgetExceededNotification = true;
+    }
+  }
+
   Future<void> _loadUserEmailAndData() async {
+
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString('email') ?? '';
     setState(() {
@@ -101,7 +155,14 @@ class _HomeScreenState extends State<HomeScreen> {
         .where((t) => t['type'] == 'Expense')
         .fold(0.0, (sum, item) => sum + double.parse(item['amount'].toString()));
 
+
+    // Post frame callback to trigger async budget check
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBudgetAndNotify(expenseTotal);
+    });
+
     return Scaffold(
+
       backgroundColor: const Color(0xFFFDF7F0),
       appBar: AppBar(
         backgroundColor: const Color(0xFFFDF7F0),
@@ -134,7 +195,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          _buildProfileImage(),
+          GestureDetector(
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+              if (result == true) {
+                _loadUserEmailAndData(); // Refresh if budget was changed or removed
+              }
+            },
+            child: _buildProfileImage(),
+          ),
         ],
       ),
       body: Column(
@@ -305,13 +377,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: Text("No transactions yet"));
     }
 
-    final transactionList = filteredTransactions;
-
     return ListView.builder(
-      itemCount: transactionList.length,
+      itemCount: filteredTransactions.length,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       itemBuilder: (context, index) {
-        final tx = transactionList[index];
+        final tx = filteredTransactions[index];
         final isIncome = tx['type'] == 'Income';
 
         final cardColor = (isIncome ? Colors.greenAccent : Colors.redAccent).withOpacity(0.1);
@@ -366,7 +436,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _loadTransactions();
         }
         if (index == 2) Navigator.pushNamed(context, '/statistics');
-        if (index == 3) Navigator.pushNamed(context, '/profile');
+        if (index == 3) {
+          final result = await Navigator.pushNamed(context, '/profile');
+          if (result == true) {
+            _loadUserEmailAndData(); // রিফ্রেশ হোম বাজেট
+          }
+        }
       },
       selectedItemColor: Colors.black,
       unselectedItemColor: Colors.grey,

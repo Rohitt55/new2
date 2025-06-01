@@ -23,8 +23,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     'Subscription',
     'Grocery',
     'Personal',
-    'Medicine', // Changed from Health
-    'Others'    // Newly added
+    'Medicine',
+    'Others'
   ];
 
   String _selectedCategory = 'Food';
